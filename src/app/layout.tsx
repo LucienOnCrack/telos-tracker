@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TELOS HOUSE TO SLUSH",
+  title: "TRACK TELOS HOUSE",
   description: "Track TELOS HOUSE ON THERE WAY TO SLUSH",
 };
 

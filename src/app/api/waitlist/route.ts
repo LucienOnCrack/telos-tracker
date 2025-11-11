@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// In-memory storage (will reset on server restart)
-// For production, use a database like Supabase, Firebase, or Airtable
-const waitlist: Array<{
-  name: string;
-  phone: string;
-  timestamp: number;
-}> = [];
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +14,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if phone already exists
-    const exists = waitlist.find((entry) => entry.phone === phone);
+    const exists = await prisma.waitlist.findUnique({
+      where: { phone },
+    });
+
     if (exists) {
       return NextResponse.json(
         { error: 'Phone number already registered' },
@@ -29,18 +25,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const entry = {
-      name,
-      phone,
-      timestamp: Date.now(),
-    };
+    // Create new waitlist entry
+    await prisma.waitlist.create({
+      data: {
+        name,
+        phone,
+      },
+    });
 
-    waitlist.push(entry);
+    // Get total count for position
+    const total = await prisma.waitlist.count();
 
     return NextResponse.json({
       success: true,
       message: 'Successfully added to waitlist',
-      position: waitlist.length,
+      position: total,
     });
   } catch (error) {
     console.error('Error adding to waitlist:', error);
@@ -52,12 +51,28 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({
-    total: waitlist.length,
-    waitlist: waitlist.map((entry, idx) => ({
-      position: idx + 1,
-      name: entry.name,
-      timestamp: entry.timestamp,
-    })),
-  });
+  try {
+    const entries = await prisma.waitlist.findMany({
+      orderBy: { createdAt: 'asc' },
+      select: {
+        name: true,
+        createdAt: true,
+      },
+    });
+
+    return NextResponse.json({
+      total: entries.length,
+      waitlist: entries.map((entry: { name: string; createdAt: Date }, idx: number) => ({
+        position: idx + 1,
+        name: entry.name,
+        timestamp: entry.createdAt.getTime(),
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching waitlist:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch waitlist' },
+      { status: 500 }
+    );
+  }
 }
