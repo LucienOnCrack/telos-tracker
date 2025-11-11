@@ -26,7 +26,8 @@ export default function RoadTripMap() {
   const lastAddressLookupTime = useRef(0);
   const lastAddressCoords = useRef<[number, number] | null>(null);
 
-  const departureDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+  // Set departure date to November 12th at 12:00 PM (noon)
+  const departureDate = new Date('2025-11-12T12:00:00');
 
   const routeLocations: Location[] = [
     { name: 'Brussels, Belgium', coords: [4.3517, 50.8503], type: 'waypoint' },
@@ -472,20 +473,22 @@ export default function RoadTripMap() {
 
       <div ref={mapContainer} className="w-full h-full" />
 
-      {!countdownExpired && (
-        <div className="absolute top-14 right-4 z-40 pointer-events-auto">
-          <div className="bg-black/95 px-6 py-4 rounded-lg border-2 border-red-500 shadow-[0_0_30px_rgba(255,0,0,0.3)] font-mono">
-            <div className="text-xs text-red-500 mb-1 tracking-wider">[DEPARTURE]</div>
-            <div className="text-2xl font-bold text-red-500 tracking-wider">{countdown}</div>
-            <button
-              onClick={() => setShowCodeEntry(true)}
-              className="mt-3 w-full px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded text-xs text-red-300 hover:text-red-200 transition-colors cursor-pointer font-bold"
-            >
-              &gt; JOIN_WAITLIST
-            </button>
-          </div>
+      <div className="absolute top-14 right-4 z-40 pointer-events-auto">
+        <div className="bg-black/95 px-6 py-4 rounded-lg border-2 border-red-500 shadow-[0_0_30px_rgba(255,0,0,0.3)] font-mono">
+          {!countdownExpired && (
+            <>
+              <div className="text-xs text-red-500 mb-1 tracking-wider">[DEPARTURE]</div>
+              <div className="text-2xl font-bold text-red-500 tracking-wider">{countdown}</div>
+            </>
+          )}
+          <button
+            onClick={() => setShowCodeEntry(true)}
+            className={`${!countdownExpired ? 'mt-3' : ''} w-full px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded text-xs text-red-300 hover:text-red-200 transition-colors cursor-pointer font-bold`}
+          >
+            &gt; JOIN_WAITLIST
+          </button>
         </div>
-      )}
+      </div>
 
       <div className="pointer-events-none absolute top-14 left-4 max-w-md">
         <div className="pointer-events-auto bg-black/95 px-6 py-4 rounded-lg border-2 border-red-500 shadow-[0_0_30px_rgba(255,0,0,0.3)] font-mono">
