@@ -27,8 +27,7 @@ export default function RoadTripMap() {
   const lastAddressLookupTime = useRef(0);
   const lastAddressCoords = useRef<[number, number] | null>(null);
 
-  // Set departure date to November 12th at 12:00 PM (noon)
-  const departureDate = new Date('2025-11-12T12:00:00');
+  const departureDate = new Date('2025-11-12T19:00:00');
 
   const routeLocations: Location[] = [
     { name: 'Brussels, Belgium', coords: [4.3517, 50.8503], type: 'waypoint' },
@@ -526,7 +525,7 @@ export default function RoadTripMap() {
           <div className="text-xs sm:text-sm text-red-400 mb-3 sm:mb-4">
             <span className="text-red-500 text-[10px] sm:text-xs">[TRACKED_LOCATION]</span>
             <br />
-            <span className="text-red-300 text-xs sm:text-sm break-words">{currentLocation}</span>
+            <span className="text-red-300 text-xs sm:text-sm wrap-break-word">{currentLocation}</span>
             {isStale && (
               <span className="text-yellow-400 text-[10px] sm:text-xs ml-1">(Last seen 5+ minutes ago)</span>
             )}
