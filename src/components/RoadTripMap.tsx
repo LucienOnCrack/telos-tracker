@@ -31,7 +31,7 @@ export default function RoadTripMap() {
   const departureDate = new Date('2025-11-13T05:00:00')
 
   const routeLocations: Location[] = [
-    { name: 'Brussels, Belgium', coords: [4.3517, 50.8503], type: 'waypoint' },
+    { name: 'Paris, France', coords: [2.3522, 48.8566], type: 'waypoint' },
     { name: 'Zurich, Switzerland', coords: [8.5417, 47.3769], type: 'waypoint' },
     { name: 'Vaduz, Liechtenstein', coords: [9.5215, 47.1410], type: 'waypoint' },
     { name: 'Munich, Germany', coords: [11.5820, 48.1351], type: 'waypoint' },
@@ -503,7 +503,7 @@ export default function RoadTripMap() {
 
   const tickerMessages = [
     'CARAVAN TO SLUSH 2025',
-    'ROUTE: Brussels → Zurich → Vaduz → Munich → Berlin → Stockholm → Helsinki',
+    'ROUTE: Paris → Zurich → Vaduz → Munich → Berlin → Stockholm → Helsinki',
     'DESTINATION: SLUSH Conference Finland',
     'LIVE TRACKING ACTIVE',
     'Join the adventure of a lifetime',
