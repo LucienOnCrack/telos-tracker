@@ -91,7 +91,7 @@ export default function Home() {
                     href="https://vice.com"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-white/80 px-8 py-6 transition-all hover:scale-105"
+                    className=" px-8 py-6 transition-all hover:scale-105"
                   >
                     <Image
                       src={vice}
@@ -103,7 +103,7 @@ export default function Home() {
                     href="https://slush.org"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-white/80 px-8 py-6 transition-all hover:scale-105"
+                    className=" px-8 py-6 transition-all hover:scale-105"
                   >
                     <Image
                       src={slush}
