@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "TRACK TELOS HOUSE",
-  description: "Track TELOS HOUSE ON THERE WAY TO SLUSH",
+  description: "TRACK TELOS HOUSE ON THEIR WAY TO SLUSH",
 };
 
 export default function RootLayout({

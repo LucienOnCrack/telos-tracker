@@ -155,7 +155,8 @@ export default function RoadTripMap() {
             source: 'raster-tiles',
             paint: {
               'raster-saturation': -1,
-              'raster-brightness-max': 0.1,
+              'raster-brightness-min': 0.5,
+              'raster-brightness-max': 0.3,
               'raster-contrast': 0.8,
             },
           },
