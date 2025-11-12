@@ -28,7 +28,7 @@ export default function RoadTripMap() {
   const lastAddressLookupTime = useRef(0);
   const lastAddressCoords = useRef<[number, number] | null>(null);
 
-  const departureDate = new Date('2025-11-12T19:00:00');
+  const departureDate = new Date('2025-11-13T05:00:00')
 
   const routeLocations: Location[] = [
     { name: 'Brussels, Belgium', coords: [4.3517, 50.8503], type: 'waypoint' },
