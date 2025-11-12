@@ -139,9 +139,13 @@ export default function RoadTripMap() {
         sources: {
           'raster-tiles': {
             type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tiles: [
+              'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+              'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
+              'https://c.tile.opentopomap.org/{z}/{x}/{y}.png',
+            ],
             tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors',
+            attribution: '&copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap',
           },
         },
         layers: [
@@ -150,8 +154,9 @@ export default function RoadTripMap() {
             type: 'raster',
             source: 'raster-tiles',
             paint: {
-              'raster-saturation': -0.9,
-              'raster-brightness-max': 0.15,
+              'raster-saturation': -1,
+              'raster-brightness-max': 0.1,
+              'raster-contrast': 0.8,
             },
           },
         ],
@@ -168,7 +173,23 @@ export default function RoadTripMap() {
       setIsLoading(false);
     });
 
+    map.current.on('error', (e) => {
+      console.error('Map error:', e);
+      setIsLoading(false);
+    });
+
+    // Fallback timeout in case load event never fires
+    const loadTimeout = setTimeout(() => {
+      if (map.current && isLoading) {
+        console.warn('Map load timeout, forcing initialization');
+        addRoute();
+        addMarkers();
+        setIsLoading(false);
+      }
+    }, 5000);
+
     return () => {
+      clearTimeout(loadTimeout);
       map.current?.remove();
       if (css && css.parentNode) css.parentNode.removeChild(css);
     };
