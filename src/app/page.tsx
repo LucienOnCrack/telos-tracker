@@ -255,12 +255,12 @@ export default function Home() {
             <div className="space-y-6 py-12 sm:py-16 text-center px-4">
               <div className="animate-fade-in-scroll">
                 <div className="font-heming-variable text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl tracking-wider mb-6 sm:mb-8 drop-shadow-[0_4px_20px_rgba(0,0,0,1)] [text-shadow:2px_2px_8px_rgb(0_0_0/100%),-2px_-2px_8px_rgb(0_0_0/100%),2px_-2px_8px_rgb(0_0_0/100%),-2px_2px_8px_rgb(0_0_0/100%)]">
-                  CONTACT
+                  Contact
                 </div>
                 <div className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl drop-shadow-[0_4px_20px_rgba(0,0,0,1)] [text-shadow:1px_1px_6px_rgb(0_0_0/100%),-1px_-1px_6px_rgb(0_0_0/100%),1px_-1px_6px_rgb(0_0_0/100%),-1px_1px_6px_rgb(0_0_0/100%)] break-all sm:break-normal">
                   <a
                     href="mailto:team@teloshouse.com"
-                    className="hover:text-gray-300 transition-colors underline"
+                    className="hover:text-gray-300 transition-colors underline font-heming-variable"
                   >
                     team@teloshouse.com
                   </a>
