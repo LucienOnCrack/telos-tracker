@@ -180,6 +180,17 @@ export default function Home() {
                       </span>
                     </div>
 
+                    {/* Antwerp */}
+                    <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+                      <div className="flex flex-col items-center min-w-4 sm:min-w-5">
+                        <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 rounded-full border-2 border-white bg-black"></div>
+                        <div className="w-0.5 h-5 sm:h-8 md:h-10 bg-white/70"></div>
+                      </div>
+                      <span className="text-[10px] xs:text-xs sm:text-sm md:text-base lg:text-lg text-white">
+                        ANTWERP
+                      </span>
+                    </div>
+
                     {/* Berlin */}
                     <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
                       <div className="flex flex-col items-center min-w-4 sm:min-w-5">

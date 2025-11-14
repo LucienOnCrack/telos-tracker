@@ -21,6 +21,7 @@ export default function RoadTripMap() {
   const [timeSinceUpdate, setTimeSinceUpdate] = useState<string>('');
   const [countdown, setCountdown] = useState<string>('');
   const [countdownExpired, setCountdownExpired] = useState(false);
+  const [finalCountdown, setFinalCountdown] = useState<number | null>(null);
   const [showCodeEntry, setShowCodeEntry] = useState(false);
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [code, setCode] = useState(['', '', '', '']);
@@ -30,9 +31,10 @@ export default function RoadTripMap() {
   const lastAddressLookupTime = useRef(0);
   const lastAddressCoords = useRef<[number, number] | null>(null);
 
-  const departureDate = new Date('2025-11-14T22:00:00')
+  const departureDate = new Date('2025-11-15T00:00:00')
 
   const routeLocations: Location[] = [
+    { name: 'Antwerp, Belgium', coords: [4.4025, 51.2194], type: 'waypoint' },
     { name: 'Berlin, Germany', coords: [13.4050, 52.5200], type: 'waypoint' },
     { name: 'Copenhagen, Denmark', coords: [12.5683, 55.6761], type: 'waypoint' },
     { name: 'Stockholm, Sweden', coords: [18.0686, 59.3293], type: 'waypoint' },
@@ -104,6 +106,7 @@ export default function RoadTripMap() {
 
       if (distance < 0) {
         setCountdownExpired(true);
+        setFinalCountdown(null);
         return;
       }
 
@@ -111,6 +114,13 @@ export default function RoadTripMap() {
       const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+      // Show 3-2-1 countdown when 3 seconds or less remain
+      if (days === 0 && hours === 0 && minutes === 0 && seconds <= 3 && seconds > 0) {
+        setFinalCountdown(seconds);
+      } else {
+        setFinalCountdown(null);
+      }
 
       setCountdown(`${days}D ${hours}H ${minutes}M ${seconds}S`);
     };
@@ -502,7 +512,7 @@ export default function RoadTripMap() {
 
   const tickerMessages = [
     'CARAVAN TO SLUSH 2025',
-    'ROUTE: London → Berlin → Copenhagen → Stockholm → Helsinki',
+    'ROUTE: London → Antwerp → Berlin → Copenhagen → Stockholm → Helsinki',
     'DESTINATION: SLUSH Conference Finland',
     'LIVE TRACKING ACTIVE',
     'Join the adventure of a lifetime',
@@ -565,7 +575,7 @@ export default function RoadTripMap() {
                     &gt; CARAVAN DEPARTURE
                   </div>
                   <div className="text-red-400 font-mono text-[9px] sm:text-xs md:text-sm lg:text-base tracking-wider sm:tracking-widest wrap-break-word px-2">
-                    LONDON → BERLIN → COPENHAGEN → STOCKHOLM → HELSINKI
+                    LONDON → ANTWERP → BERLIN → COPENHAGEN → STOCKHOLM → HELSINKI
                   </div>
                 </div>
 
@@ -650,6 +660,39 @@ export default function RoadTripMap() {
                   {String.fromCharCode(33 + Math.random() * 94)}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {finalCountdown !== null && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/95 z-60 pointer-events-none">
+          <div className="relative">
+            {/* Pulsing rings */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="w-64 h-64 sm:w-96 sm:h-96 md:w-lg md:h-128 rounded-full border-4 border-red-500 animate-ping opacity-75"
+                style={{ animationDuration: '1s' }}
+              ></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="w-48 h-48 sm:w-72 sm:h-72 md:w-96 md:h-96 rounded-full border-4 border-red-400 animate-ping opacity-50"
+                style={{ animationDuration: '1s', animationDelay: '0.2s' }}
+              ></div>
+            </div>
+
+            {/* Main countdown number */}
+            <div className="relative flex items-center justify-center">
+              <div
+                className="text-[12rem] sm:text-[16rem] md:text-[20rem] lg:text-[24rem] font-black text-red-500 font-mono animate-pulse drop-shadow-[0_0_60px_rgba(255,0,0,1)]"
+                style={{
+                  textShadow: '0 0 80px rgba(255,0,0,1), 0 0 120px rgba(255,0,0,0.8), 0 0 160px rgba(255,0,0,0.6)',
+                  animation: 'countdownPulse 1s ease-in-out'
+                }}
+              >
+                {finalCountdown}
+              </div>
             </div>
           </div>
         </div>
@@ -947,6 +990,21 @@ export default function RoadTripMap() {
           }
           50% {
             text-shadow: 0 0 30px rgba(255, 0, 0, 1), 0 0 60px rgba(255, 0, 0, 1);
+          }
+        }
+
+        @keyframes countdownPulse {
+          0% {
+            transform: scale(0.8);
+            opacity: 0;
+          }
+          50% {
+            transform: scale(1.1);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
           }
         }
 
