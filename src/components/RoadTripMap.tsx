@@ -30,7 +30,7 @@ export default function RoadTripMap() {
   const lastAddressLookupTime = useRef(0);
   const lastAddressCoords = useRef<[number, number] | null>(null);
 
-  const departureDate = new Date('2025-11-14T19:00:00')
+  const departureDate = new Date('2025-11-14T20:30:00')
 
   const routeLocations: Location[] = [
     { name: 'Berlin, Germany', coords: [13.4050, 52.5200], type: 'waypoint' },
@@ -556,7 +556,7 @@ export default function RoadTripMap() {
                       <Image
                         src={slush}
                         alt="SLUSH"
-                        className="relative w-32 sm:w-48 md:w-64 lg:w-80 xl:w-96 h-auto drop-shadow-[0_0_20px_rgba(255,0,0,0.8)] animate-glow"
+                        className="relative w-28 sm:w-40 md:w-48 lg:w-52 xl:w-64 h-auto drop-shadow-[0_0_20px_rgba(255,0,0,0.8)] animate-glow"
                       />
                     </div>
                   </div>
