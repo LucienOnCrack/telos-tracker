@@ -529,21 +529,124 @@ export default function RoadTripMap() {
 
       <div ref={mapContainer} className="w-full h-full" />
 
-      <div className="absolute top-12 sm:top-14 right-2 sm:right-4 z-40 pointer-events-auto">
-        <div className="bg-black/95 px-3 py-2 sm:px-6 sm:py-4 rounded-lg border-2 border-red-500 shadow-[0_0_30px_rgba(255,0,0,0.3)] font-mono">
-          {!countdownExpired && (
-            <>
-              <div className="text-[10px] sm:text-xs text-red-500 mb-1 tracking-wider">[DEPARTURE]</div>
-              <div className="text-base sm:text-2xl font-bold text-red-500 tracking-wider">{countdown}</div>
-            </>
-          )}
-          <button
-            onClick={() => setShowCodeEntry(true)}
-            className={`${!countdownExpired ? 'mt-2 sm:mt-3' : ''} w-full px-2 py-1.5 sm:px-4 sm:py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded text-[10px] sm:text-xs text-red-300 hover:text-red-200 transition-colors cursor-pointer font-bold whitespace-nowrap`}
-          >
-            &gt; JOIN_WAITLIST
-          </button>
+      {!countdownExpired && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/95 backdrop-blur-md z-50 pointer-events-none overflow-y-auto py-4">
+          <div className="relative w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 my-auto">
+            {/* Scanline effect */}
+            <div className="absolute inset-0 bg-linear-to-b from-transparent via-red-500/5 to-transparent animate-scanline pointer-events-none"></div>
+
+            {/* Main countdown container */}
+            <div className="relative">
+              {/* Glitch borders */}
+              <div className="absolute -inset-1 bg-linear-to-rrom-red-500 via-red-600 to-red-500 opacity-75 blur-xl animate-pulse"></div>
+
+              <div className="relative bg-black border-2 sm:border-4 border-red-500 shadow-[0_0_30px_rgba(255,0,0,0.4),inset_0_0_30px_rgba(255,0,0,0.1)] sm:shadow-[0_0_50px_rgba(255,0,0,0.5),inset_0_0_50px_rgba(255,0,0,0.1)] p-4 sm:p-8 md:p-12 lg:p-16">
+                {/* Header */}
+                <div className="text-center mb-4 sm:mb-8 md:mb-12">
+                  <div className="text-red-500 font-mono text-[10px] sm:text-xs md:text-sm lg:text-base tracking-[0.2em] sm:tracking-[0.3em] mb-1 sm:mb-2 md:mb-4 animate-pulse">
+                    [MISSION BRIEFING]
+                  </div>
+                  <div className="text-white font-mono text-base sm:text-xl md:text-2xl lg:text-4xl xl:text-5xl tracking-wide sm:tracking-wider mb-1 sm:mb-2 md:mb-4 drop-shadow-[0_0_10px_rgba(255,0,0,0.8)]">
+                    &gt; CARAVAN DEPARTURE
+                  </div>
+                  <div className="text-red-400 font-mono text-[9px] sm:text-xs md:text-sm lg:text-base tracking-wider sm:tracking-widest wrap-break-word px-2">
+                    LONDON → BERLIN → COPENHAGEN → STOCKHOLM → HELSINKI
+                  </div>
+                </div>
+
+                {/* Countdown Display */}
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-3 md:gap-4 lg:gap-6 xl:gap-8 mb-4 sm:mb-8 md:mb-12">
+                  {countdown && [
+                    { label: 'DAYS', value: countdown.split(' ')[0]?.replace('D', '') || '00' },
+                    { label: 'HOURS', value: countdown.split(' ')[1]?.replace('H', '') || '00' },
+                    { label: 'MINUTES', value: countdown.split(' ')[2]?.replace('M', '') || '00' },
+                    { label: 'SECONDS', value: countdown.split(' ')[3]?.replace('S', '') || '00' },
+                  ].map((unit, idx) => (
+                    <div key={idx} className="relative group">
+                      {/* Glowing background */}
+                      <div className="absolute inset-0 bg-red-500/10 group-hover:bg-red-500/20 transition-all duration-300"></div>
+
+                      {/* Border effect */}
+                      <div className="relative border border-red-500 sm:border-2 bg-black/80 p-2 sm:p-4 md:p-6 lg:p-8 shadow-[0_0_15px_rgba(255,0,0,0.3)] sm:shadow-[0_0_30px_rgba(255,0,0,0.3)] group-hover:shadow-[0_0_30px_rgba(255,0,0,0.5)] sm:group-hover:shadow-[0_0_50px_rgba(255,0,0,0.5)] transition-all duration-300">
+                        {/* Corner accents */}
+                        <div className="absolute top-0 left-0 w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-3 md:h-3 border-t-2 border-l-2 sm:border-t-4 sm:border-l-4 border-white"></div>
+                        <div className="absolute top-0 right-0 w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-3 md:h-3 border-t-2 border-r-2 sm:border-t-4 sm:border-r-4 border-white"></div>
+                        <div className="absolute bottom-0 left-0 w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-3 md:h-3 border-b-2 border-l-2 sm:border-b-4 sm:border-l-4 border-white"></div>
+                        <div className="absolute bottom-0 right-0 w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-3 md:h-3 border-b-2 border-r-2 sm:border-b-4 sm:border-r-4 border-white"></div>
+
+                        {/* Number */}
+                        <div className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl 2xl:text-8xl font-bold text-red-500 font-mono text-center mb-1 sm:mb-2 md:mb-3 tracking-tight sm:tracking-wider drop-shadow-[0_0_10px_rgba(255,0,0,1)] sm:drop-shadow-[0_0_20px_rgba(255,0,0,1)] animate-glow">
+                          {unit.value.padStart(2, '0')}
+                        </div>
+
+                        {/* Label */}
+                        <div className="text-[6px] xs:text-[7px] sm:text-[10px] md:text-xs lg:text-sm text-red-400 font-mono text-center tracking-widest sm:tracking-[0.2em] md:tracking-[0.3em]">
+                          {unit.label}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Status Messages */}
+                <div className="space-y-1 sm:space-y-2 md:space-y-3 mb-4 sm:mb-6 md:mb-8">
+                  <div className="flex items-center justify-center gap-1.5 sm:gap-2 md:gap-3">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-3 md:h-3 bg-red-500 rounded-full animate-ping"></div>
+                    <span className="text-red-500 font-mono text-[9px] sm:text-xs md:text-sm lg:text-base tracking-wide sm:tracking-wider">
+                      MISSION STATUS: STANDBY
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center gap-1.5 sm:gap-2 md:gap-3">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-3 md:h-3 bg-green-400 rounded-full animate-pulse"></div>
+                    <span className="text-green-400 font-mono text-[9px] sm:text-xs md:text-sm lg:text-base tracking-wide sm:tracking-wider">
+                      SYSTEMS: OPERATIONAL
+                    </span>
+                  </div>
+                  <div className="text-center text-yellow-400 font-mono text-[9px] sm:text-xs md:text-sm lg:text-base tracking-wide sm:tracking-wider animate-pulse px-2">
+                    AWAITING DEPARTURE SEQUENCE
+                  </div>
+                </div>
+
+                {/* Join Button */}
+                <div className="flex justify-center pointer-events-auto">
+                  <button
+                    onClick={() => setShowCodeEntry(true)}
+                    className="group relative px-4 sm:px-6 md:px-8 lg:px-12 py-2 sm:py-3 md:py-4 lg:py-5 bg-red-500/20 hover:bg-red-500/30 border border-red-500 sm:border-2 font-mono text-xs sm:text-sm md:text-base lg:text-xl text-red-300 hover:text-red-100 tracking-wider sm:tracking-widest transition-all duration-300 cursor-pointer shadow-[0_0_20px_rgba(255,0,0,0.3)] sm:shadow-[0_0_30px_rgba(255,0,0,0.3)] hover:shadow-[0_0_40px_rgba(255,0,0,0.6)] sm:hover:shadow-[0_0_50px_rgba(255,0,0,0.6)] overflow-hidden"
+                  >
+                    <span className="relative z-10">&gt; JOIN_CARAVAN</span>
+                    <div className="absolute inset-0 bg-linear-to-r from-transparent via-red-500/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Matrix-style falling characters effect */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-20">
+              {[...Array(20)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute text-red-500 font-mono text-xs opacity-50 animate-fall"
+                  style={{
+                    left: `${i * 5}%`,
+                    animationDelay: `${i * 0.1}s`,
+                    animationDuration: `${3 + (i % 3)}s`,
+                  }}
+                >
+                  {String.fromCharCode(33 + Math.random() * 94)}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
+      )}
+
+      <div className="absolute top-12 sm:top-14 right-2 sm:right-4 z-40 pointer-events-auto">
+        <button
+          onClick={() => setShowCodeEntry(true)}
+          className={`${countdownExpired ? '' : 'hidden'} px-2 py-1.5 sm:px-4 sm:py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded text-[10px] sm:text-xs text-red-300 hover:text-red-200 transition-colors cursor-pointer font-bold whitespace-nowrap font-mono`}
+        >
+          &gt; JOIN_WAITLIST
+        </button>
       </div>
 
       <div className="pointer-events-none absolute top-28 sm:top-14 left-2 sm:left-4 right-2 sm:right-auto sm:max-w-md">
@@ -814,9 +917,56 @@ export default function RoadTripMap() {
           }
         }
 
+        @keyframes scanline {
+          0% {
+            transform: translateY(-100%);
+          }
+          100% {
+            transform: translateY(100%);
+          }
+        }
+
+        @keyframes glow {
+          0%, 100% {
+            text-shadow: 0 0 20px rgba(255, 0, 0, 1), 0 0 40px rgba(255, 0, 0, 0.8);
+          }
+          50% {
+            text-shadow: 0 0 30px rgba(255, 0, 0, 1), 0 0 60px rgba(255, 0, 0, 1);
+          }
+        }
+
+        @keyframes fall {
+          0% {
+            transform: translateY(-100vh);
+            opacity: 0;
+          }
+          10% {
+            opacity: 1;
+          }
+          90% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(100vh);
+            opacity: 0;
+          }
+        }
+
         .ticker-content {
           display: inline-block;
           animation: ticker 30s linear infinite;
+        }
+
+        .animate-scanline {
+          animation: scanline 8s linear infinite;
+        }
+
+        .animate-glow {
+          animation: glow 2s ease-in-out infinite;
+        }
+
+        .animate-fall {
+          animation: fall 3s linear infinite;
         }
       `}</style>
     </div>
