@@ -128,6 +128,17 @@ export default function LaunchPage() {
             <label className="block text-xs text-red-400 mb-2 font-mono">
               SELECT_TRACKER:
             </label>
+
+            {/* Status Summary */}
+            {activeTrackers.size > 0 && (
+              <div className="mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded text-[10px] text-green-400 font-mono">
+                {Array.from(activeTrackers).map(trackerId => {
+                  const tracker = TRACKERS.find(t => t.id === trackerId);
+                  return tracker ? `${tracker.label.toUpperCase()}` : trackerId;
+                }).join(', ')} currently in use
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               {TRACKERS.map((tracker) => {
                 const isAlreadyActive = activeTrackers.has(tracker.id) && selectedTracker !== tracker.id;
@@ -156,11 +167,18 @@ export default function LaunchPage() {
                           className={`inline-block w-2 h-2 rounded-full ${isAlreadyActive ? 'animate-pulse' : ''}`}
                           style={{ backgroundColor: isAlreadyActive ? '#10b981' : tracker.color }}
                         ></span>
-                        {tracker.label.toUpperCase()}
+                        <span style={{ color: isAlreadyActive ? '#10b981' : tracker.color }}>
+                          {tracker.label.toUpperCase()}
+                        </span>
                       </div>
                       {isAlreadyActive && (
-                        <div className="text-[10px] text-green-400">
-                          LAUNCHED
+                        <div className="text-[10px] text-green-400 font-bold">
+                          IN USE
+                        </div>
+                      )}
+                      {!isAlreadyActive && selectedTracker !== tracker.id && (
+                        <div className="text-[10px] text-red-400/50">
+                          AVAILABLE
                         </div>
                       )}
                     </div>
