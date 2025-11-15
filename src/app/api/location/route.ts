@@ -8,6 +8,13 @@ const trackerLocations = new Map<string, {
   timestamp: number;
 }>();
 
+// Store complete route history for each tracker
+const trackerHistory = new Map<string, Array<{
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+}>>();
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -34,6 +41,26 @@ export async function POST(request: NextRequest) {
     };
 
     trackerLocations.set(trackerId, location);
+
+    // Add to history
+    if (!trackerHistory.has(trackerId)) {
+      trackerHistory.set(trackerId, []);
+    }
+    const history = trackerHistory.get(trackerId)!;
+
+    // Only add if location has changed significantly (avoid duplicates)
+    const lastLocation = history[history.length - 1];
+    const shouldAdd = !lastLocation ||
+      Math.abs(lastLocation.latitude - latitude) > 0.0001 ||
+      Math.abs(lastLocation.longitude - longitude) > 0.0001;
+
+    if (shouldAdd) {
+      history.push(location);
+      // Keep last 1000 points to avoid memory issues
+      if (history.length > 1000) {
+        history.shift();
+      }
+    }
 
     return NextResponse.json({ success: true, trackerId, location });
   } catch (error) {
@@ -82,6 +109,7 @@ export async function GET(request: NextRequest) {
     trackerId: id,
     location,
     stale: Date.now() - location.timestamp > 5 * 60 * 1000,
+    history: trackerHistory.get(id) || [],
   }));
 
   return NextResponse.json({ trackers: allTrackers });

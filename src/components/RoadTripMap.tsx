@@ -20,6 +20,11 @@ interface TrackerLocation {
     timestamp: number;
   };
   stale: boolean;
+  history?: Array<{
+    latitude: number;
+    longitude: number;
+    timestamp: number;
+  }>;
 }
 
 export default function RoadTripMap() {
@@ -45,6 +50,7 @@ export default function RoadTripMap() {
   const lastAddressCoords = useRef<Map<string, [number, number]>>(new Map());
   const previousStaleStatus = useRef<Map<string, boolean>>(new Map());
   const [recentlyOnlineTrackers, setRecentlyOnlineTrackers] = useState<Set<string>>(new Set());
+  const trackerRouteLayersRef = useRef<Set<string>>(new Set());
 
   const departureDate = new Date('2025-11-15T02:00:00')
 
@@ -64,52 +70,108 @@ export default function RoadTripMap() {
         if (response.ok) {
           const data = await response.json();
           if (data.trackers && data.trackers.length > 0) {
-            // Check for trackers that came back online
-            const newlyOnline = new Set<string>();
+            // Create a map of existing trackers by ID for easy lookup
+            const existingTrackersMap = new Map(
+              trackerLocations.map(t => [t.trackerId, t])
+            );
+
+            // Merge new data with existing trackers
+            const updatedTrackers: TrackerLocation[] = [];
+
+            // Update trackers that have new data
             data.trackers.forEach((tracker: TrackerLocation) => {
+              updatedTrackers.push(tracker);
+
+              // Check for trackers that came back online
               const wasStale = previousStaleStatus.current.get(tracker.trackerId);
               if (wasStale === true && !tracker.stale) {
                 // Tracker was offline and is now online
+                const newlyOnline = new Set(recentlyOnlineTrackers);
                 newlyOnline.add(tracker.trackerId);
+                setRecentlyOnlineTrackers(newlyOnline);
+
+                // Clear the notification after 10 seconds
+                setTimeout(() => {
+                  setRecentlyOnlineTrackers(prev => {
+                    const updated = new Set(prev);
+                    updated.delete(tracker.trackerId);
+                    return updated;
+                  });
+                }, 10000);
               }
+
               // Update previous status
               previousStaleStatus.current.set(tracker.trackerId, tracker.stale);
+
+              // Remove from existing map since we've processed it
+              existingTrackersMap.delete(tracker.trackerId);
             });
 
-            // Update recently online trackers
-            if (newlyOnline.size > 0) {
-              setRecentlyOnlineTrackers(newlyOnline);
-              // Clear the notification after 10 seconds
-              setTimeout(() => {
-                setRecentlyOnlineTrackers(new Set());
-              }, 10000);
+            // Keep any trackers that weren't in the new data but exist in our state
+            // This ensures trackers never disappear once they've reported
+            existingTrackersMap.forEach((existingTracker) => {
+              updatedTrackers.push({
+                ...existingTracker,
+                stale: true
+              });
+              previousStaleStatus.current.set(existingTracker.trackerId, true);
+            });
+
+            setTrackerLocations(updatedTrackers);
+
+            // Update last update time from the most recent non-stale tracker
+            const activeTrackers = updatedTrackers.filter(t => !t.stale);
+            if (activeTrackers.length > 0) {
+              const mostRecent = activeTrackers.reduce((latest: TrackerLocation, current: TrackerLocation) =>
+                current.location.timestamp > latest.location.timestamp ? current : latest
+              );
+              setLastUpdate(new Date(mostRecent.location.timestamp));
             }
 
-            setTrackerLocations(data.trackers);
-            // Update last update time from the most recent tracker
-            const mostRecent = data.trackers.reduce((latest: TrackerLocation, current: TrackerLocation) =>
-              current.location.timestamp > latest.location.timestamp ? current : latest
-            );
-            setLastUpdate(new Date(mostRecent.location.timestamp));
-            setIsStale(data.trackers.some((t: TrackerLocation) => t.stale));
+            setIsStale(updatedTrackers.some((t: TrackerLocation) => t.stale));
 
             // Update location status
-            const activeCount = data.trackers.filter((t: TrackerLocation) => !t.stale).length;
+            const activeCount = updatedTrackers.filter((t: TrackerLocation) => !t.stale).length;
             setCurrentLocation(`${activeCount} of ${TRACKERS.length} trackers active`);
           } else {
-            setTrackerLocations([]);
+            // No trackers in response, but keep existing ones and mark as stale
+            if (trackerLocations.length > 0) {
+              const staleTrackers = trackerLocations.map(t => ({
+                ...t,
+                stale: true
+              }));
+              setTrackerLocations(staleTrackers);
+              setIsStale(true);
+              setCurrentLocation(`0 of ${TRACKERS.length} trackers active`);
+            } else {
+              setCurrentLocation('Waiting for trackers to launch...');
+              setIsStale(false);
+            }
+          }
+        } else {
+          // Keep existing trackers on error
+          if (trackerLocations.length > 0) {
+            const staleTrackers = trackerLocations.map(t => ({
+              ...t,
+              stale: true
+            }));
+            setTrackerLocations(staleTrackers);
+            setIsStale(true);
+            setCurrentLocation(`0 of ${TRACKERS.length} trackers active`);
+          } else {
             setCurrentLocation('Waiting for trackers to launch...');
             setIsStale(false);
           }
-        } else {
-          setTrackerLocations([]);
-          setCurrentLocation('Waiting for trackers to launch...');
-          setIsStale(false);
         }
       } catch (error) {
         console.error('Failed to fetch location:', error);
-        setCurrentLocation('Unable to fetch location');
-        setIsStale(false);
+        // Keep existing trackers on error
+        if (trackerLocations.length > 0) {
+          setCurrentLocation('Unable to fetch location (showing last known)');
+        } else {
+          setCurrentLocation('Unable to fetch location');
+        }
+        setIsStale(true);
       }
     };
 
@@ -120,7 +182,7 @@ export default function RoadTripMap() {
     return () => {
       clearInterval(interval);
     };
-  }, []);
+  }, [trackerLocations, recentlyOnlineTrackers]);
 
   useEffect(() => {
     if (!lastUpdate) return;
@@ -418,6 +480,54 @@ export default function RoadTripMap() {
         .addTo(map.current!);
 
       trackerMarkersRef.current.set(tracker.trackerId, marker);
+    });
+
+    // Draw route history for each tracker
+    trackerLocations.forEach((tracker) => {
+      if (!tracker.history || tracker.history.length < 2) return;
+
+      const color = getTrackerColor(tracker.trackerId);
+      const sourceId = `tracker-route-${tracker.trackerId}`;
+      const layerId = `tracker-route-layer-${tracker.trackerId}`;
+
+      const coords = tracker.history.map(point => [
+        point.longitude,
+        point.latitude,
+      ]);
+
+      // Remove existing layer and source if they exist
+      if (map.current!.getLayer(layerId)) {
+        map.current!.removeLayer(layerId);
+      }
+      if (map.current!.getSource(sourceId)) {
+        map.current!.removeSource(sourceId);
+      }
+
+      // Add new source and layer for this tracker's route
+      map.current!.addSource(sourceId, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: coords,
+          },
+          properties: {},
+        },
+      });
+
+      map.current!.addLayer({
+        id: layerId,
+        type: 'line',
+        source: sourceId,
+        paint: {
+          'line-color': color,
+          'line-width': 3,
+          'line-opacity': 0.7,
+        },
+      });
+
+      trackerRouteLayersRef.current.add(layerId);
     });
 
     // Update route to connect tracker locations to waypoints
