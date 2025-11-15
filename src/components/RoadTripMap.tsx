@@ -70,108 +70,122 @@ export default function RoadTripMap() {
         if (response.ok) {
           const data = await response.json();
           if (data.trackers && data.trackers.length > 0) {
-            // Create a map of existing trackers by ID for easy lookup
-            const existingTrackersMap = new Map(
-              trackerLocations.map(t => [t.trackerId, t])
-            );
+            // Use functional update to access current state
+            setTrackerLocations(currentTrackers => {
+              // Create a map of existing trackers by ID for easy lookup
+              const existingTrackersMap = new Map(
+                currentTrackers.map(t => [t.trackerId, t])
+              );
 
-            // Merge new data with existing trackers
-            const updatedTrackers: TrackerLocation[] = [];
+              // Merge new data with existing trackers
+              const updatedTrackers: TrackerLocation[] = [];
 
-            // Update trackers that have new data
-            data.trackers.forEach((tracker: TrackerLocation) => {
-              updatedTrackers.push(tracker);
+              // Update trackers that have new data
+              data.trackers.forEach((tracker: TrackerLocation) => {
+                updatedTrackers.push(tracker);
 
-              // Check for trackers that came back online
-              const wasStale = previousStaleStatus.current.get(tracker.trackerId);
-              if (wasStale === true && !tracker.stale) {
-                // Tracker was offline and is now online
-                const newlyOnline = new Set(recentlyOnlineTrackers);
-                newlyOnline.add(tracker.trackerId);
-                setRecentlyOnlineTrackers(newlyOnline);
-
-                // Clear the notification after 10 seconds
-                setTimeout(() => {
+                // Check for trackers that came back online
+                const wasStale = previousStaleStatus.current.get(tracker.trackerId);
+                if (wasStale === true && !tracker.stale) {
+                  // Tracker was offline and is now online
                   setRecentlyOnlineTrackers(prev => {
-                    const updated = new Set(prev);
-                    updated.delete(tracker.trackerId);
-                    return updated;
+                    const newlyOnline = new Set(prev);
+                    newlyOnline.add(tracker.trackerId);
+                    return newlyOnline;
                   });
-                }, 10000);
+
+                  // Clear the notification after 10 seconds
+                  setTimeout(() => {
+                    setRecentlyOnlineTrackers(prev => {
+                      const updated = new Set(prev);
+                      updated.delete(tracker.trackerId);
+                      return updated;
+                    });
+                  }, 10000);
+                }
+
+                // Update previous status
+                previousStaleStatus.current.set(tracker.trackerId, tracker.stale);
+
+                // Remove from existing map since we've processed it
+                existingTrackersMap.delete(tracker.trackerId);
+              });
+
+              // Keep any trackers that weren't in the new data but exist in our state
+              // This ensures trackers never disappear once they've reported
+              existingTrackersMap.forEach((existingTracker) => {
+                updatedTrackers.push({
+                  ...existingTracker,
+                  stale: true
+                });
+                previousStaleStatus.current.set(existingTracker.trackerId, true);
+              });
+
+              // Update last update time from the most recent non-stale tracker
+              const activeTrackers = updatedTrackers.filter(t => !t.stale);
+              if (activeTrackers.length > 0) {
+                const mostRecent = activeTrackers.reduce((latest: TrackerLocation, current: TrackerLocation) =>
+                  current.location.timestamp > latest.location.timestamp ? current : latest
+                );
+                setLastUpdate(new Date(mostRecent.location.timestamp));
               }
 
-              // Update previous status
-              previousStaleStatus.current.set(tracker.trackerId, tracker.stale);
+              setIsStale(updatedTrackers.some((t: TrackerLocation) => t.stale));
 
-              // Remove from existing map since we've processed it
-              existingTrackersMap.delete(tracker.trackerId);
+              // Update location status
+              const activeCount = updatedTrackers.filter((t: TrackerLocation) => !t.stale).length;
+              setCurrentLocation(`${activeCount} of ${TRACKERS.length} trackers active`);
+
+              return updatedTrackers;
             });
-
-            // Keep any trackers that weren't in the new data but exist in our state
-            // This ensures trackers never disappear once they've reported
-            existingTrackersMap.forEach((existingTracker) => {
-              updatedTrackers.push({
-                ...existingTracker,
-                stale: true
-              });
-              previousStaleStatus.current.set(existingTracker.trackerId, true);
-            });
-
-            setTrackerLocations(updatedTrackers);
-
-            // Update last update time from the most recent non-stale tracker
-            const activeTrackers = updatedTrackers.filter(t => !t.stale);
-            if (activeTrackers.length > 0) {
-              const mostRecent = activeTrackers.reduce((latest: TrackerLocation, current: TrackerLocation) =>
-                current.location.timestamp > latest.location.timestamp ? current : latest
-              );
-              setLastUpdate(new Date(mostRecent.location.timestamp));
-            }
-
-            setIsStale(updatedTrackers.some((t: TrackerLocation) => t.stale));
-
-            // Update location status
-            const activeCount = updatedTrackers.filter((t: TrackerLocation) => !t.stale).length;
-            setCurrentLocation(`${activeCount} of ${TRACKERS.length} trackers active`);
           } else {
             // No trackers in response, but keep existing ones and mark as stale
-            if (trackerLocations.length > 0) {
-              const staleTrackers = trackerLocations.map(t => ({
-                ...t,
-                stale: true
-              }));
-              setTrackerLocations(staleTrackers);
-              setIsStale(true);
-              setCurrentLocation(`0 of ${TRACKERS.length} trackers active`);
-            } else {
-              setCurrentLocation('Waiting for trackers to launch...');
-              setIsStale(false);
-            }
+            setTrackerLocations(currentTrackers => {
+              if (currentTrackers.length > 0) {
+                const staleTrackers = currentTrackers.map(t => ({
+                  ...t,
+                  stale: true
+                }));
+                setIsStale(true);
+                setCurrentLocation(`0 of ${TRACKERS.length} trackers active`);
+                return staleTrackers;
+              } else {
+                setCurrentLocation('Waiting for trackers to launch...');
+                setIsStale(false);
+                return currentTrackers;
+              }
+            });
           }
         } else {
           // Keep existing trackers on error
-          if (trackerLocations.length > 0) {
-            const staleTrackers = trackerLocations.map(t => ({
-              ...t,
-              stale: true
-            }));
-            setTrackerLocations(staleTrackers);
-            setIsStale(true);
-            setCurrentLocation(`0 of ${TRACKERS.length} trackers active`);
-          } else {
-            setCurrentLocation('Waiting for trackers to launch...');
-            setIsStale(false);
-          }
+          setTrackerLocations(currentTrackers => {
+            if (currentTrackers.length > 0) {
+              const staleTrackers = currentTrackers.map(t => ({
+                ...t,
+                stale: true
+              }));
+              setIsStale(true);
+              setCurrentLocation(`0 of ${TRACKERS.length} trackers active`);
+              return staleTrackers;
+            } else {
+              setCurrentLocation('Waiting for trackers to launch...');
+              setIsStale(false);
+              return currentTrackers;
+            }
+          });
         }
       } catch (error) {
         console.error('Failed to fetch location:', error);
         // Keep existing trackers on error
-        if (trackerLocations.length > 0) {
-          setCurrentLocation('Unable to fetch location (showing last known)');
-        } else {
-          setCurrentLocation('Unable to fetch location');
-        }
-        setIsStale(true);
+        setTrackerLocations(currentTrackers => {
+          if (currentTrackers.length > 0) {
+            setCurrentLocation('Unable to fetch location (showing last known)');
+          } else {
+            setCurrentLocation('Unable to fetch location');
+          }
+          setIsStale(true);
+          return currentTrackers;
+        });
       }
     };
 
@@ -182,7 +196,7 @@ export default function RoadTripMap() {
     return () => {
       clearInterval(interval);
     };
-  }, [trackerLocations, recentlyOnlineTrackers]);
+  }, []); // Empty dependency array - run once on mount, polling handles updates
 
   useEffect(() => {
     if (!lastUpdate) return;
