@@ -43,6 +43,8 @@ export default function RoadTripMap() {
   const trackerMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
   const lastAddressLookup = useRef<Map<string, number>>(new Map());
   const lastAddressCoords = useRef<Map<string, [number, number]>>(new Map());
+  const previousStaleStatus = useRef<Map<string, boolean>>(new Map());
+  const [recentlyOnlineTrackers, setRecentlyOnlineTrackers] = useState<Set<string>>(new Set());
 
   const departureDate = new Date('2025-11-15T02:00:00')
 
@@ -62,6 +64,27 @@ export default function RoadTripMap() {
         if (response.ok) {
           const data = await response.json();
           if (data.trackers && data.trackers.length > 0) {
+            // Check for trackers that came back online
+            const newlyOnline = new Set<string>();
+            data.trackers.forEach((tracker: TrackerLocation) => {
+              const wasStale = previousStaleStatus.current.get(tracker.trackerId);
+              if (wasStale === true && !tracker.stale) {
+                // Tracker was offline and is now online
+                newlyOnline.add(tracker.trackerId);
+              }
+              // Update previous status
+              previousStaleStatus.current.set(tracker.trackerId, tracker.stale);
+            });
+
+            // Update recently online trackers
+            if (newlyOnline.size > 0) {
+              setRecentlyOnlineTrackers(newlyOnline);
+              // Clear the notification after 10 seconds
+              setTimeout(() => {
+                setRecentlyOnlineTrackers(new Set());
+              }, 10000);
+            }
+
             setTrackerLocations(data.trackers);
             // Update last update time from the most recent tracker
             const mostRecent = data.trackers.reduce((latest: TrackerLocation, current: TrackerLocation) =>
@@ -833,6 +856,25 @@ export default function RoadTripMap() {
                     const address = trackerAddresses.get(tracker.trackerId) || 'Loading address...';
                     const googleMapsUrl = `https://www.google.com/maps?q=${tracker.location.latitude},${tracker.location.longitude}`;
 
+                    // Calculate time since last update for this specific tracker
+                    const timeSinceLastUpdate = () => {
+                      const seconds = Math.floor((Date.now() - tracker.location.timestamp) / 1000);
+                      if (seconds < 60) {
+                        return `${seconds}s ago`;
+                      } else if (seconds < 3600) {
+                        const minutes = Math.floor(seconds / 60);
+                        return `${minutes}m ago`;
+                      } else if (seconds < 86400) {
+                        const hours = Math.floor(seconds / 3600);
+                        return `${hours}h ago`;
+                      } else {
+                        const days = Math.floor(seconds / 86400);
+                        return `${days}d ago`;
+                      }
+                    };
+
+                    const isRecentlyOnline = recentlyOnlineTrackers.has(tracker.trackerId);
+
                     return (
                       <div key={tracker.trackerId} className="border border-red-500/20 rounded-md p-2 bg-black/50">
                         <div className="text-[10px] sm:text-xs text-red-500/70 flex items-center gap-2 mb-1">
@@ -844,7 +886,15 @@ export default function RoadTripMap() {
                           {tracker.stale && (
                             <span className="text-yellow-400 text-[10px]">(offline)</span>
                           )}
+                          {isRecentlyOnline && (
+                            <span className="text-green-400 text-[10px] animate-pulse">(back online!)</span>
+                          )}
                         </div>
+                        {tracker.stale && (
+                          <div className="text-[9px] sm:text-[10px] text-yellow-400/80 mb-1 ml-4">
+                            Last seen: {timeSinceLastUpdate()}
+                          </div>
+                        )}
                         <div className="text-[10px] sm:text-xs text-red-300/90 mb-1 ml-4">
                           {address}
                         </div>
