@@ -1,11 +1,48 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { TRACKERS } from '../../config/trackers';
+
+interface ActiveTracker {
+  trackerId: string;
+  stale: boolean;
+}
 
 export default function LaunchPage() {
   const [status, setStatus] = useState<'idle' | 'launching' | 'active' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [watchId, setWatchId] = useState<number | null>(null);
+  const [selectedTracker, setSelectedTracker] = useState<string>(TRACKERS[0].id);
+  const [activeTrackers, setActiveTrackers] = useState<Set<string>>(new Set());
+
+  // Fetch active trackers on mount and periodically
+  useEffect(() => {
+    const fetchActiveTrackers = async () => {
+      try {
+        const response = await fetch('/api/location');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.trackers && data.trackers.length > 0) {
+            const active = new Set<string>(
+              data.trackers
+                .filter((t: ActiveTracker) => !t.stale)
+                .map((t: ActiveTracker) => t.trackerId)
+            );
+            setActiveTrackers(active);
+          } else {
+            setActiveTrackers(new Set<string>());
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch active trackers:', error);
+      }
+    };
+
+    fetchActiveTrackers();
+    const interval = setInterval(fetchActiveTrackers, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLaunch = () => {
     if (!navigator.geolocation) {
@@ -19,7 +56,8 @@ export default function LaunchPage() {
 
     const id = navigator.geolocation.watchPosition(
       async (position) => {
-        const coords = {
+        const data = {
+          trackerId: selectedTracker,
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           timestamp: Date.now(),
@@ -29,12 +67,13 @@ export default function LaunchPage() {
           const response = await fetch('/api/location', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(coords),
+            body: JSON.stringify(data),
           });
 
           if (response.ok) {
             setStatus('active');
-            setMessage(`Sharing location: ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`);
+            const trackerLabel = TRACKERS.find(t => t.id === selectedTracker)?.label || selectedTracker;
+            setMessage(`Sharing ${trackerLabel}: ${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`);
           } else {
             throw new Error('Failed to share location');
           }
@@ -82,6 +121,53 @@ export default function LaunchPage() {
             <p className="text-xs text-red-300/70 font-mono">
               Share your live location with the tracker
             </p>
+          </div>
+
+          {/* Tracker Selection */}
+          <div className="mb-6">
+            <label className="block text-xs text-red-400 mb-2 font-mono">
+              SELECT_TRACKER:
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {TRACKERS.map((tracker) => {
+                const isAlreadyActive = activeTrackers.has(tracker.id) && selectedTracker !== tracker.id;
+                const isDisabled = (status === 'active' || status === 'launching') || isAlreadyActive;
+
+                return (
+                  <button
+                    key={tracker.id}
+                    onClick={() => !isAlreadyActive && setSelectedTracker(tracker.id)}
+                    disabled={isDisabled}
+                    className={`py-3 px-4 rounded border-2 font-mono text-xs transition-all ${
+                      selectedTracker === tracker.id
+                        ? 'border-red-500 bg-red-500/20 text-red-200 shadow-[0_0_15px_rgba(255,0,0,0.3)]'
+                        : isAlreadyActive
+                        ? 'border-green-500/30 bg-green-500/5 text-green-400/70 opacity-60'
+                        : 'border-red-500/30 bg-red-500/5 text-red-400/70 hover:border-red-500/50 hover:bg-red-500/10'
+                    } ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    style={{
+                      boxShadow: selectedTracker === tracker.id ? `0 0 15px ${tracker.color}40` : undefined,
+                      borderColor: selectedTracker === tracker.id ? tracker.color : isAlreadyActive ? '#10b981' : undefined,
+                    }}
+                  >
+                    <div className="flex flex-col items-center justify-center gap-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-block w-2 h-2 rounded-full ${isAlreadyActive ? 'animate-pulse' : ''}`}
+                          style={{ backgroundColor: isAlreadyActive ? '#10b981' : tracker.color }}
+                        ></span>
+                        {tracker.label.toUpperCase()}
+                      </div>
+                      {isAlreadyActive && (
+                        <div className="text-[10px] text-green-400">
+                          LAUNCHED
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {message && (

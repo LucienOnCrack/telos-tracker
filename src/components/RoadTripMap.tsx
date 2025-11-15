@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import Image from 'next/image';
 import slush from "../../assets/slush.svg"
+import { TRACKERS, getTrackerColor } from '../config/trackers';
 
 interface Location {
   name: string;
@@ -11,12 +12,23 @@ interface Location {
   type: 'waypoint' | 'destination';
 }
 
+interface TrackerLocation {
+  trackerId: string;
+  location: {
+    latitude: number;
+    longitude: number;
+    timestamp: number;
+  };
+  stale: boolean;
+}
+
 export default function RoadTripMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentLocation, setCurrentLocation] = useState('Waiting for tracker to launch...');
-  const [liveCoords, setLiveCoords] = useState<[number, number] | null>(null);
+  const [currentLocation, setCurrentLocation] = useState('Waiting for trackers to launch...');
+  const [trackerLocations, setTrackerLocations] = useState<TrackerLocation[]>([]);
+  const [trackerAddresses, setTrackerAddresses] = useState<Map<string, string>>(new Map());
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [timeSinceUpdate, setTimeSinceUpdate] = useState<string>('');
   const [countdown, setCountdown] = useState<string>('');
@@ -27,9 +39,9 @@ export default function RoadTripMap() {
   const [code, setCode] = useState(['', '', '', '']);
   const [isStale, setIsStale] = useState(false);
   const [isRouteExpanded, setIsRouteExpanded] = useState(false);
-  const currentMarkerRef = useRef<maplibregl.Marker | null>(null);
-  const lastAddressLookupTime = useRef(0);
-  const lastAddressCoords = useRef<[number, number] | null>(null);
+  const trackerMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
+  const lastAddressLookup = useRef<Map<string, number>>(new Map());
+  const lastAddressCoords = useRef<Map<string, [number, number]>>(new Map());
 
   const departureDate = new Date('2025-11-15T02:00:00')
 
@@ -48,18 +60,26 @@ export default function RoadTripMap() {
 
         if (response.ok) {
           const data = await response.json();
-          if (data.location) {
-            const coords: [number, number] = [
-              data.location.longitude,
-              data.location.latitude,
-            ];
-            setLiveCoords(coords);
-            setLastUpdate(new Date(data.location.timestamp));
-            setIsStale(data.stale || false);
-            updateCurrentLocation(coords);
+          if (data.trackers && data.trackers.length > 0) {
+            setTrackerLocations(data.trackers);
+            // Update last update time from the most recent tracker
+            const mostRecent = data.trackers.reduce((latest: TrackerLocation, current: TrackerLocation) =>
+              current.location.timestamp > latest.location.timestamp ? current : latest
+            );
+            setLastUpdate(new Date(mostRecent.location.timestamp));
+            setIsStale(data.trackers.some((t: TrackerLocation) => t.stale));
+
+            // Update location status
+            const activeCount = data.trackers.filter((t: TrackerLocation) => !t.stale).length;
+            setCurrentLocation(`${activeCount} of ${TRACKERS.length} trackers active`);
+          } else {
+            setTrackerLocations([]);
+            setCurrentLocation('Waiting for trackers to launch...');
+            setIsStale(false);
           }
         } else {
-          setCurrentLocation('Waiting for tracker to launch...');
+          setTrackerLocations([]);
+          setCurrentLocation('Waiting for trackers to launch...');
           setIsStale(false);
         }
       } catch (error) {
@@ -269,183 +289,250 @@ export default function RoadTripMap() {
   };
 
   useEffect(() => {
-    if (!map.current || !liveCoords) return;
+    if (!map.current || trackerLocations.length === 0) return;
 
-    currentMarkerRef.current?.remove();
+    // Remove markers for trackers that no longer exist
+    trackerMarkersRef.current.forEach((marker, trackerId) => {
+      if (!trackerLocations.some(t => t.trackerId === trackerId)) {
+        marker.remove();
+        trackerMarkersRef.current.delete(trackerId);
+      }
+    });
 
-    const container = document.createElement('div');
-    container.style.position = 'relative';
-    container.style.width = '20px';
-    container.style.height = '20px';
+    // Update or create markers for each tracker
+    trackerLocations.forEach((tracker) => {
+      const coords: [number, number] = [
+        tracker.location.longitude,
+        tracker.location.latitude,
+      ];
 
-    const outerRing = document.createElement('div');
-    outerRing.style.position = 'absolute';
-    outerRing.style.top = '50%';
-    outerRing.style.left = '50%';
-    outerRing.style.width = '40px';
-    outerRing.style.height = '40px';
-    outerRing.style.marginLeft = '-20px';
-    outerRing.style.marginTop = '-20px';
-    outerRing.style.border = '2px solid #ff0000';
-    outerRing.style.borderRadius = '50%';
-    outerRing.style.animation = 'ripple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite';
+      const color = getTrackerColor(tracker.trackerId);
+      const trackerConfig = TRACKERS.find(t => t.id === tracker.trackerId);
+      const label = trackerConfig?.label || tracker.trackerId;
 
-    const middleRing = document.createElement('div');
-    middleRing.style.position = 'absolute';
-    middleRing.style.top = '50%';
-    middleRing.style.left = '50%';
-    middleRing.style.width = '30px';
-    middleRing.style.height = '30px';
-    middleRing.style.marginLeft = '-15px';
-    middleRing.style.marginTop = '-15px';
-    middleRing.style.border = '2px solid #ff0000';
-    middleRing.style.borderRadius = '50%';
-    middleRing.style.animation = 'ripple 2s cubic-bezier(0, 0.2, 0.8, 1) 0.5s infinite';
+      // Remove existing marker if it exists
+      const existingMarker = trackerMarkersRef.current.get(tracker.trackerId);
+      if (existingMarker) {
+        existingMarker.remove();
+      }
 
-    const dot = document.createElement('div');
-    dot.style.position = 'absolute';
-    dot.style.top = '50%';
-    dot.style.left = '50%';
-    dot.style.width = '20px';
-    dot.style.height = '20px';
-    dot.style.marginLeft = '-10px';
-    dot.style.marginTop = '-10px';
-    dot.style.background = '#ff0000';
-    dot.style.borderRadius = '50%';
-    dot.style.boxShadow = '0 0 40px #ff0000, 0 0 20px #ff0000, 0 0 10px #ff0000';
-    dot.style.border = '2px solid #ffffff';
-    dot.style.animation = 'blink 1s step-end infinite';
+      // Create marker container with label
+      const container = document.createElement('div');
+      container.style.display = 'flex';
+      container.style.flexDirection = 'column';
+      container.style.alignItems = 'center';
+      container.style.gap = '4px';
 
-    container.appendChild(outerRing);
-    container.appendChild(middleRing);
-    container.appendChild(dot);
+      // Add tracker label above the marker
+      const labelDiv = document.createElement('div');
+      labelDiv.textContent = label;
+      labelDiv.style.fontSize = '10px';
+      labelDiv.style.fontWeight = 'bold';
+      labelDiv.style.color = color;
+      labelDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+      labelDiv.style.padding = '2px 6px';
+      labelDiv.style.borderRadius = '4px';
+      labelDiv.style.border = `1px solid ${color}`;
+      labelDiv.style.whiteSpace = 'nowrap';
+      labelDiv.style.fontFamily = 'monospace';
+      labelDiv.style.textShadow = `0 0 10px ${color}`;
 
-    const marker = new maplibregl.Marker({ element: container, anchor: 'center' })
-      .setLngLat(liveCoords)
-      .addTo(map.current);
+      // Create marker with animated rings
+      const markerContainer = document.createElement('div');
+      markerContainer.style.position = 'relative';
+      markerContainer.style.width = '20px';
+      markerContainer.style.height = '20px';
 
-    currentMarkerRef.current = marker;
+      const outerRing = document.createElement('div');
+      outerRing.style.position = 'absolute';
+      outerRing.style.top = '50%';
+      outerRing.style.left = '50%';
+      outerRing.style.width = '40px';
+      outerRing.style.height = '40px';
+      outerRing.style.marginLeft = '-20px';
+      outerRing.style.marginTop = '-20px';
+      outerRing.style.border = `2px solid ${color}`;
+      outerRing.style.borderRadius = '50%';
+      outerRing.style.animation = 'ripple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite';
 
+      const middleRing = document.createElement('div');
+      middleRing.style.position = 'absolute';
+      middleRing.style.top = '50%';
+      middleRing.style.left = '50%';
+      middleRing.style.width = '30px';
+      middleRing.style.height = '30px';
+      middleRing.style.marginLeft = '-15px';
+      middleRing.style.marginTop = '-15px';
+      middleRing.style.border = `2px solid ${color}`;
+      middleRing.style.borderRadius = '50%';
+      middleRing.style.animation = 'ripple 2s cubic-bezier(0, 0.2, 0.8, 1) 0.5s infinite';
+
+      const dot = document.createElement('div');
+      dot.style.position = 'absolute';
+      dot.style.top = '50%';
+      dot.style.left = '50%';
+      dot.style.width = '20px';
+      dot.style.height = '20px';
+      dot.style.marginLeft = '-10px';
+      dot.style.marginTop = '-10px';
+      dot.style.background = color;
+      dot.style.borderRadius = '50%';
+      dot.style.boxShadow = `0 0 40px ${color}, 0 0 20px ${color}, 0 0 10px ${color}`;
+      dot.style.border = '2px solid #ffffff';
+      dot.style.animation = tracker.stale ? 'none' : 'blink 1s step-end infinite';
+      dot.style.opacity = tracker.stale ? '0.5' : '1';
+
+      markerContainer.appendChild(outerRing);
+      markerContainer.appendChild(middleRing);
+      markerContainer.appendChild(dot);
+
+      container.appendChild(labelDiv);
+      container.appendChild(markerContainer);
+
+      const marker = new maplibregl.Marker({ element: container, anchor: 'bottom' })
+        .setLngLat(coords)
+        .addTo(map.current!);
+
+      trackerMarkersRef.current.set(tracker.trackerId, marker);
+    });
+
+    // Update route to connect tracker locations to waypoints
     if (map.current.getSource('route')) {
-      const coords = [liveCoords, ...routeLocations.map((r) => r.coords)];
+      const trackerCoords = trackerLocations.map(tracker => [
+        tracker.location.longitude,
+        tracker.location.latitude,
+      ]);
+      const waypointCoords = routeLocations.map((r) => r.coords);
+      const allCoords = [...trackerCoords, ...waypointCoords];
+
       (map.current.getSource('route') as maplibregl.GeoJSONSource).setData({
         type: 'Feature',
-        geometry: { type: 'LineString', coordinates: coords },
+        geometry: { type: 'LineString', coordinates: allCoords },
         properties: {},
       });
     }
-  }, [liveCoords]);
+  }, [trackerLocations]);
 
-  const updateCurrentLocation = async (coords: [number, number]) => {
-    const now = Date.now();
-    if (now - lastAddressLookupTime.current < 1000) return;
+  // Fetch addresses for trackers
+  useEffect(() => {
+    const fetchAddressForTracker = async (trackerId: string, coords: [number, number]) => {
+      const now = Date.now();
+      const lastLookup = lastAddressLookup.current.get(trackerId) || 0;
 
-    if (lastAddressCoords.current) {
-      const [lastLon, lastLat] = lastAddressCoords.current;
-      const distanceChange = Math.hypot(coords[0] - lastLon, coords[1] - lastLat);
-      if (distanceChange < 0.001) return;
-    }
+      // Rate limiting: don't lookup more than once per second
+      if (now - lastLookup < 1000) return;
 
-    lastAddressLookupTime.current = now;
-    lastAddressCoords.current = coords;
-
-    const services = [
-      async () => {
-        const response = await fetch(
-          `https://corsproxy.io/?${encodeURIComponent(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[1]}&lon=${coords[0]}&zoom=18&addressdetails=1`
-          )}`
-        );
-        const data = await response.json();
-
-        if (data.address) {
-          const parts = [];
-          // Build detailed street address
-          if (data.address.house_number && data.address.road) {
-            parts.push(`${data.address.house_number} ${data.address.road}`);
-          } else if (data.address.road) {
-            parts.push(data.address.road);
-          }
-
-          // Add neighborhood/suburb if available and different from city
-          if (data.address.suburb || data.address.neighbourhood) {
-            const area = data.address.suburb || data.address.neighbourhood;
-            parts.push(area);
-          }
-
-          // Add city/town
-          if (data.address.city || data.address.town || data.address.village) {
-            parts.push(data.address.city || data.address.town || data.address.village);
-          }
-
-          // Add country (shortened)
-          if (data.address.country) {
-            // Shorten common long country names
-            const country = data.address.country
-              .replace('United Kingdom of Great Britain and Northern Ireland (the)', 'United Kingdom')
-              .replace('United Kingdom', 'UK');
-            parts.push(country);
-          }
-
-          return parts.join(', ') || data.display_name;
-        }
-        return data.display_name;
-      },
-      async () => {
-        const response = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords[1]}&longitude=${coords[0]}&localityLanguage=en`
-        );
-        const data = await response.json();
-
-        const parts = [];
-        // Try to build a detailed address
-        if (data.localityInfo?.administrative?.[0]?.name) {
-          parts.push(data.localityInfo.administrative[0].name);
-        }
-        if (data.locality) parts.push(data.locality);
-        if (data.city && data.city !== data.locality) parts.push(data.city);
-        if (data.principalSubdivision) parts.push(data.principalSubdivision);
-        if (data.countryName) parts.push(data.countryName === 'United Kingdom' ? 'UK' : data.countryName);
-
-        if (parts.length > 0) return parts.join(', ');
-        return null;
-      },
-      async () => {
-        const response = await fetch(
-          `https://api.opencagedata.com/geocode/v1/json?q=${coords[1]},${coords[0]}&key=demo&language=en&pretty=1&no_annotations=1`
-        );
-        const data = await response.json();
-        if (data.results && data.results[0]) {
-          // Clean up the formatted address
-          let address = data.results[0].formatted;
-          address = address
-            .replace('United Kingdom of Great Britain and Northern Ireland (the)', 'UK')
-            .replace('United Kingdom', 'UK');
-          return address;
-        }
-        return null;
-      },
-    ];
-
-    for (const service of services) {
-      try {
-        const address = await service();
-        if (address) {
-          setCurrentLocation(address);
-          return;
-        }
-      } catch (error) {
-        console.warn('Geocoding service failed, trying next...', error);
-        continue;
+      // Check if coordinates changed significantly
+      const lastCoords = lastAddressCoords.current.get(trackerId);
+      if (lastCoords) {
+        const [lastLon, lastLat] = lastCoords;
+        const distanceChange = Math.hypot(coords[0] - lastLon, coords[1] - lastLat);
+        if (distanceChange < 0.001) return;
       }
+
+      lastAddressLookup.current.set(trackerId, now);
+      lastAddressCoords.current.set(trackerId, coords);
+
+      // Try geocoding services
+      const services = [
+        async () => {
+          const response = await fetch(
+            `https://corsproxy.io/?${encodeURIComponent(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[1]}&lon=${coords[0]}&zoom=18&addressdetails=1`
+            )}`
+          );
+          const data = await response.json();
+
+          if (data.address) {
+            const parts = [];
+            // Build detailed street address
+            if (data.address.house_number && data.address.road) {
+              parts.push(`${data.address.house_number} ${data.address.road}`);
+            } else if (data.address.road) {
+              parts.push(data.address.road);
+            }
+
+            // Add neighborhood/suburb if available
+            if (data.address.suburb || data.address.neighbourhood) {
+              const area = data.address.suburb || data.address.neighbourhood;
+              parts.push(area);
+            }
+
+            // Add city/town
+            if (data.address.city || data.address.town || data.address.village) {
+              parts.push(data.address.city || data.address.town || data.address.village);
+            }
+
+            // Add country
+            if (data.address.country) {
+              parts.push(data.address.country);
+            }
+
+            return parts.join(', ') || data.display_name;
+          }
+          return data.display_name;
+        },
+        async () => {
+          const response = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords[1]}&longitude=${coords[0]}&localityLanguage=en`
+          );
+          const data = await response.json();
+
+          const parts = [];
+          if (data.localityInfo?.administrative?.[0]?.name) {
+            parts.push(data.localityInfo.administrative[0].name);
+          }
+          if (data.locality) parts.push(data.locality);
+          if (data.city && data.city !== data.locality) parts.push(data.city);
+          if (data.principalSubdivision) parts.push(data.principalSubdivision);
+          if (data.countryName) parts.push(data.countryName);
+
+          if (parts.length > 0) return parts.join(', ');
+          return null;
+        },
+      ];
+
+      for (const service of services) {
+        try {
+          const address = await service();
+          if (address) {
+            setTrackerAddresses(prev => new Map(prev).set(trackerId, address));
+            return;
+          }
+        } catch (error) {
+          console.warn('Geocoding failed for tracker:', trackerId, error);
+        }
+      }
+
+      // Fallback to coordinates
+      setTrackerAddresses(prev => new Map(prev).set(trackerId, `${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}`));
+    };
+
+    trackerLocations.forEach(tracker => {
+      const coords: [number, number] = [tracker.location.longitude, tracker.location.latitude];
+      fetchAddressForTracker(tracker.trackerId, coords);
+    });
+  }, [trackerLocations]);
+
+  const focusOnAllTrackers = () => {
+    if (!map.current || trackerLocations.length === 0) return;
+
+    // If there's only one tracker, focus on it
+    if (trackerLocations.length === 1) {
+      const coords: [number, number] = [
+        trackerLocations[0].location.longitude,
+        trackerLocations[0].location.latitude,
+      ];
+      map.current.flyTo({ center: coords, zoom: 12, duration: 1200, essential: true });
+      return;
     }
 
-    setCurrentLocation(`${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}`);
-  };
-
-  const focusOnCurrentLocation = () => {
-    if (!map.current || !liveCoords) return;
-    map.current.flyTo({ center: liveCoords, zoom: 12, duration: 1200, essential: true });
+    // Otherwise, fit bounds to show all trackers
+    const bounds = new maplibregl.LngLatBounds();
+    trackerLocations.forEach(tracker => {
+      bounds.extend([tracker.location.longitude, tracker.location.latitude]);
+    });
+    map.current.fitBounds(bounds, { padding: 100, duration: 1200 });
   };
 
   const handleCodeSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -712,16 +799,54 @@ export default function RoadTripMap() {
           <div className="text-lg sm:text-2xl font-bold text-red-500 mb-2 sm:mb-3 tracking-wider">&gt; TO SLUSH</div>
 
           <div className="text-xs sm:text-sm text-red-400 mb-3 sm:mb-4">
-            <span className="text-red-500 text-[10px] sm:text-xs">[TRACKED_LOCATION]</span>
+            <span className="text-red-500 text-[10px] sm:text-xs">[TRACKED_LOCATIONS]</span>
             <br />
             <span className="text-red-300 text-xs sm:text-sm wrap-break-word">{currentLocation}</span>
             {isStale && (
-              <span className="text-yellow-400 text-[10px] sm:text-xs ml-1">(Last seen 5+ minutes ago)</span>
+              <span className="text-yellow-400 text-[10px] sm:text-xs ml-1">(Some trackers offline)</span>
             )}
-            {liveCoords && (
+            {trackerLocations.length > 0 && (
               <>
-                <div className="text-[10px] sm:text-xs text-red-500/70 mt-1">
-                  {liveCoords[1].toFixed(6)}, {liveCoords[0].toFixed(6)}
+                {/* Display active trackers */}
+                <div className="mt-2 space-y-3">
+                  {trackerLocations.map(tracker => {
+                    const trackerConfig = TRACKERS.find(t => t.id === tracker.trackerId);
+                    const label = trackerConfig?.label || tracker.trackerId;
+                    const color = trackerConfig?.color || '#ff0000';
+                    const address = trackerAddresses.get(tracker.trackerId) || 'Loading address...';
+                    const googleMapsUrl = `https://www.google.com/maps?q=${tracker.location.latitude},${tracker.location.longitude}`;
+
+                    return (
+                      <div key={tracker.trackerId} className="border border-red-500/20 rounded-md p-2 bg-black/50">
+                        <div className="text-[10px] sm:text-xs text-red-500/70 flex items-center gap-2 mb-1">
+                          <span
+                            className="inline-block w-2 h-2 rounded-full"
+                            style={{ backgroundColor: color }}
+                          ></span>
+                          <span style={{ color }} className="font-bold">{label.toUpperCase()}</span>
+                          {tracker.stale && (
+                            <span className="text-yellow-400 text-[10px]">(offline)</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] sm:text-xs text-red-300/90 mb-1 ml-4">
+                          {address}
+                        </div>
+                        <div className="text-[9px] sm:text-[10px] text-red-300/50 mb-2 ml-4">
+                          {tracker.location.latitude.toFixed(6)}, {tracker.location.longitude.toFixed(6)}
+                        </div>
+                        <div className="ml-4">
+                          <a
+                            href={googleMapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded text-[9px] sm:text-[10px] text-red-300 hover:text-red-200 transition-colors whitespace-nowrap"
+                          >
+                            &gt; OPEN_GOOGLE_MAPS
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
                 {lastUpdate && !isStale && (
                   <div className="text-[10px] sm:text-xs text-green-400 mt-1 flex items-center gap-2">
@@ -731,19 +856,11 @@ export default function RoadTripMap() {
                 )}
                 <div className="flex flex-col sm:flex-row gap-2 mt-2">
                   <button
-                    onClick={focusOnCurrentLocation}
+                    onClick={focusOnAllTrackers}
                     className="inline-flex items-center justify-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded text-[10px] sm:text-xs text-red-300 hover:text-red-200 transition-colors cursor-pointer whitespace-nowrap"
                   >
-                    &gt; ZOOM_TO_TARGET
+                    &gt; VIEW_ALL_TRACKERS
                   </button>
-                  <a
-                    href={`https://www.google.com/maps?q=${liveCoords[1]},${liveCoords[0]}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded text-[10px] sm:text-xs text-red-300 hover:text-red-200 transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    &gt; OPEN_GOOGLE_MAPS
-                  </a>
                 </div>
               </>
             )}
