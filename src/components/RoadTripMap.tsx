@@ -538,7 +538,7 @@ export default function RoadTripMap() {
         source: sourceId,
         paint: {
           'line-color': color,
-          'line-width': 3,
+          'line-width': 8,
           'line-opacity': 0.7,
         },
       });
@@ -577,7 +577,8 @@ export default function RoadTripMap() {
       if (lastCoords) {
         const [lastLon, lastLat] = lastCoords;
         const distanceChange = Math.hypot(coords[0] - lastLon, coords[1] - lastLat);
-        if (distanceChange < 0.001) return;
+        // 0.01 degrees ≈ 1.11km at equator, allowing for tracking over 1000+ meters
+        if (distanceChange < 0.01) return;
       }
 
       lastAddressLookup.current.set(trackerId, now);
