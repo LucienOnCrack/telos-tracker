@@ -19,3 +19,27 @@ model Waitlist {
 
   @@map("waitlist")
 }
+
+model TrackerLocation {
+  id        String   @id @default(cuid())
+  trackerId String
+  latitude  Float
+  longitude Float
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([trackerId])
+  @@index([timestamp])
+  @@map("tracker_locations")
+}
+
+model TrackerState {
+  id        String   @id @default(cuid())
+  trackerId String   @unique
+  latitude  Float
+  longitude Float
+  timestamp DateTime
+  updatedAt DateTime @updatedAt
+
+  @@map("tracker_state")
+}

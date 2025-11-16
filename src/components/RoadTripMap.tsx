@@ -55,10 +55,12 @@ export default function RoadTripMap() {
   const departureDate = new Date('2025-11-15T02:00:00')
 
   const routeLocations: Location[] = [
+    { name: 'King\'s Cross, London', coords: [-0.1246, 51.5308], type: 'waypoint' },
     { name: 'Antwerp, Belgium', coords: [4.4025, 51.2194], type: 'waypoint' },
     { name: 'Berlin, Germany', coords: [13.4050, 52.5200], type: 'waypoint' },
-    { name: 'Copenhagen, Denmark', coords: [12.5683, 55.6761], type: 'waypoint' },
-    { name: 'Stockholm, Sweden', coords: [18.0686, 59.3293], type: 'waypoint' },
+    { name: 'Warsaw, Poland', coords: [21.0122, 52.2297], type: 'waypoint' },
+    { name: 'Riga, Latvia', coords: [24.1052, 56.9496], type: 'waypoint' },
+    { name: 'Tallinn, Estonia', coords: [24.7536, 59.4370], type: 'waypoint' },
     { name: 'Helsinki, Finland', coords: [24.9384, 60.1699], type: 'destination' },
   ];
 
@@ -747,7 +749,7 @@ export default function RoadTripMap() {
 
   const tickerMessages = [
     'CARAVAN TO SLUSH 2025',
-    'ROUTE: London → Antwerp → Berlin → Copenhagen → Stockholm → Helsinki',
+    'ROUTE: King\'s Cross London → Antwerp → Berlin → Warsaw → Riga → Tallinn → Helsinki',
     'DESTINATION: SLUSH Conference Finland',
     'LIVE TRACKING ACTIVE',
     'Join the adventure of a lifetime',
@@ -810,7 +812,7 @@ export default function RoadTripMap() {
                     &gt; CARAVAN DEPARTURE
                   </div>
                   <div className="text-red-400 font-mono text-[9px] sm:text-xs md:text-sm lg:text-base tracking-wider sm:tracking-widest wrap-break-word px-2">
-                    LONDON → ANTWERP → BERLIN → COPENHAGEN → STOCKHOLM → HELSINKI
+                    KING'S CROSS LONDON → ANTWERP → BERLIN → WARSAW → RIGA → TALLINN → HELSINKI
                   </div>
                 </div>
 

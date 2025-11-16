@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
 
-// In-memory storage (will reset on server restart)
-// For production, use a database like Redis, Supabase, or Firebase
-const trackerLocations = new Map<string, {
-  latitude: number;
-  longitude: number;
-  timestamp: number;
-}>();
-
-// Store complete route history for each tracker
-const trackerHistory = new Map<string, Array<{
-  latitude: number;
-  longitude: number;
-  timestamp: number;
-}>>();
+const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,35 +22,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const location = {
-      latitude,
-      longitude,
-      timestamp: timestamp || Date.now(),
-    };
+    const locationTimestamp = timestamp ? new Date(timestamp) : new Date();
 
-    trackerLocations.set(trackerId, location);
-
-    // Add to history
-    if (!trackerHistory.has(trackerId)) {
-      trackerHistory.set(trackerId, []);
-    }
-    const history = trackerHistory.get(trackerId)!;
+    // Get the last location for this tracker to check if we should add a new point
+    const lastLocation = await prisma.trackerLocation.findFirst({
+      where: { trackerId },
+      orderBy: { timestamp: 'desc' },
+    });
 
     // Only add if location has changed significantly (avoid duplicates)
-    const lastLocation = history[history.length - 1];
     const shouldAdd = !lastLocation ||
       Math.abs(lastLocation.latitude - latitude) > 0.0001 ||
       Math.abs(lastLocation.longitude - longitude) > 0.0001;
 
     if (shouldAdd) {
-      history.push(location);
-      // Keep last 1000 points to avoid memory issues
-      if (history.length > 1000) {
-        history.shift();
-      }
+      // Add to location history
+      await prisma.trackerLocation.create({
+        data: {
+          trackerId,
+          latitude,
+          longitude,
+          timestamp: locationTimestamp,
+        },
+      });
     }
 
-    return NextResponse.json({ success: true, trackerId, location });
+    // Update or create the current tracker state
+    await prisma.trackerState.upsert({
+      where: { trackerId },
+      update: {
+        latitude,
+        longitude,
+        timestamp: locationTimestamp,
+      },
+      create: {
+        trackerId,
+        latitude,
+        longitude,
+        timestamp: locationTimestamp,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      trackerId,
+      location: { latitude, longitude, timestamp: locationTimestamp }
+    });
   } catch (error) {
     console.error('Error storing location:', error);
     return NextResponse.json(
@@ -73,44 +78,91 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const trackerId = searchParams.get('trackerId');
+  try {
+    const { searchParams } = new URL(request.url);
+    const trackerId = searchParams.get('trackerId');
 
-  // If trackerId is specified, return that tracker's location
-  if (trackerId) {
-    const location = trackerLocations.get(trackerId);
+    // If trackerId is specified, return that tracker's location
+    if (trackerId) {
+      const state = await prisma.trackerState.findUnique({
+        where: { trackerId },
+      });
 
-    if (!location) {
-      return NextResponse.json(
-        { error: 'No location data available for this tracker' },
-        { status: 404 }
-      );
+      if (!state) {
+        return NextResponse.json(
+          { error: 'No location data available for this tracker' },
+          { status: 404 }
+        );
+      }
+
+      // Check if location is stale (older than 5 minutes)
+      const isStale = Date.now() - state.timestamp.getTime() > 5 * 60 * 1000;
+
+      // Get history for this tracker
+      const history = await prisma.trackerLocation.findMany({
+        where: { trackerId },
+        orderBy: { timestamp: 'asc' },
+        take: 1000, // Limit to last 1000 points
+      });
+
+      return NextResponse.json({
+        trackerId,
+        location: {
+          latitude: state.latitude,
+          longitude: state.longitude,
+          timestamp: state.timestamp.getTime(),
+        },
+        stale: isStale,
+        history: history.map(h => ({
+          latitude: h.latitude,
+          longitude: h.longitude,
+          timestamp: h.timestamp.getTime(),
+        })),
+      });
     }
 
-    // Check if location is stale (older than 5 minutes)
-    const isStale = Date.now() - location.timestamp > 5 * 60 * 1000;
+    // Otherwise, return all tracker locations
+    const allStates = await prisma.trackerState.findMany();
 
-    return NextResponse.json({
-      trackerId,
-      location,
-      stale: isStale,
-    });
-  }
+    if (allStates.length === 0) {
+      return NextResponse.json({ trackers: [] });
+    }
 
-  // Otherwise, return all tracker locations
-  if (trackerLocations.size === 0) {
+    // Get all trackers with their history
+    const allTrackers = await Promise.all(
+      allStates.map(async (state) => {
+        const history = await prisma.trackerLocation.findMany({
+          where: { trackerId: state.trackerId },
+          orderBy: { timestamp: 'asc' },
+          take: 1000, // Limit to last 1000 points
+        });
+
+        // Check if location is stale (older than 5 minutes)
+        const isStale = Date.now() - state.timestamp.getTime() > 5 * 60 * 1000;
+
+        return {
+          trackerId: state.trackerId,
+          location: {
+            latitude: state.latitude,
+            longitude: state.longitude,
+            timestamp: state.timestamp.getTime(),
+          },
+          stale: isStale,
+          history: history.map(h => ({
+            latitude: h.latitude,
+            longitude: h.longitude,
+            timestamp: h.timestamp.getTime(),
+          })),
+        };
+      })
+    );
+
+    return NextResponse.json({ trackers: allTrackers });
+  } catch (error) {
+    console.error('Error fetching locations:', error);
     return NextResponse.json(
-      { error: 'No location data available' },
-      { status: 404 }
+      { error: 'Failed to fetch locations' },
+      { status: 500 }
     );
   }
-
-  const allTrackers = Array.from(trackerLocations.entries()).map(([id, location]) => ({
-    trackerId: id,
-    location,
-    stale: Date.now() - location.timestamp > 5 * 60 * 1000,
-    history: trackerHistory.get(id) || [],
-  }));
-
-  return NextResponse.json({ trackers: allTrackers });
 }
