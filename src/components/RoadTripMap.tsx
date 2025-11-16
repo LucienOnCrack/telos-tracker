@@ -64,6 +64,26 @@ export default function RoadTripMap() {
     { name: 'Helsinki, Finland', coords: [24.9384, 60.1699], type: 'destination' },
   ];
 
+  // Arbitrary fake routes starting from London (for visual interest)
+  const fakeRoutes = [
+    [
+      [-0.1246, 51.5308], // London
+      [-1.4701, 53.3811], // Sheffield
+      [-3.1883, 55.9533], // Edinburgh
+    ],
+    [
+      [-0.1246, 51.5308], // London
+      [1.2921, 52.6309], // Norwich
+      [0.1276, 52.2053], // Cambridge
+      [-0.1246, 51.5308], // Back to London
+    ],
+    [
+      [-0.1246, 51.5308], // London
+      [-2.5879, 51.4545], // Bristol
+      [-3.1791, 51.4816], // Cardiff
+    ],
+  ];
+
   useEffect(() => {
     const fetchSharedLocation = async () => {
       try {
@@ -331,6 +351,7 @@ export default function RoadTripMap() {
     if (!map.current) return;
     const coords = routeLocations.map((r) => r.coords);
 
+    // Add main route
     map.current.addSource('route', {
       type: 'geojson',
       data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} },
@@ -342,10 +363,35 @@ export default function RoadTripMap() {
       source: 'route',
       paint: {
         'line-color': '#ef4444',
-        'line-width': 2,
-        'line-dasharray': [4, 4],
+        'line-width': 5,
         'line-opacity': 0.7,
       },
+    });
+
+    // Add fake routes starting from London
+    fakeRoutes.forEach((route, index) => {
+      const sourceId = `fake-route-${index}`;
+      const layerId = `fake-route-line-${index}`;
+
+      map.current!.addSource(sourceId, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: route },
+          properties: {}
+        },
+      });
+
+      map.current!.addLayer({
+        id: layerId,
+        type: 'line',
+        source: sourceId,
+        paint: {
+          'line-color': '#ef4444',
+          'line-width': 4,
+          'line-opacity': 0.4,
+        },
+      });
     });
   };
 
@@ -538,8 +584,8 @@ export default function RoadTripMap() {
         source: sourceId,
         paint: {
           'line-color': color,
-          'line-width': 8,
-          'line-opacity': 0.7,
+          'line-width': 6,
+          'line-opacity': 0.8,
         },
       });
 
@@ -1064,7 +1110,7 @@ export default function RoadTripMap() {
             <div className="text-[10px] sm:text-xs text-red-500 tracking-wider">[ROUTE]</div>
             <button
               onClick={() => setIsRouteExpanded(!isRouteExpanded)}
-              className="sm:hidden text-red-500 transition-transform duration-200"
+              className="text-red-500 transition-transform duration-200"
               style={{ transform: isRouteExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
               aria-label="Toggle route"
             >
@@ -1073,7 +1119,7 @@ export default function RoadTripMap() {
               </svg>
             </button>
           </div>
-          <div className={`flex-col gap-1.5 text-[10px] sm:text-xs text-red-400 max-h-40 sm:max-h-64 overflow-y-auto ${isRouteExpanded ? 'flex' : 'hidden sm:flex'}`}>
+          <div className={`flex-col gap-1.5 text-[10px] sm:text-xs text-red-400 max-h-40 sm:max-h-64 overflow-y-auto ${isRouteExpanded ? 'flex' : 'hidden'}`}>
             {routeLocations.map((loc, idx) => (
               <div key={idx} className="flex items-center gap-2">
                 <div
